@@ -19,8 +19,22 @@ float h1 = 0;
 #include <SD.h>
 
 File myFile;
-void setup()
-{
+
+#include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
+ 
+const int pinCE = 9;
+const int pinCSN = 10;
+RF24 radio(pinCE, pinCSN);
+ 
+// Single radio pipe address for the 2 nodes to communicate.
+const uint64_t pipe = 0xE8E8F0F0E1LL;
+ 
+float data[9];
+int counter = 0;
+ 
+void setup(){
   Serial.begin(9600);
   gpsSerial.begin(9600)
   if (bmp180.begin())
@@ -65,11 +79,12 @@ long lat, lon;
 unsigned long fix_age, gps_time, date, gps_speed, course;
 unsigned long chars;
 unsigned short sentences, failed_checksum;
-
-
-void loop()
-{
-
+  
+   radio.begin();
+   radio.openWritingPipe(pipe);
+}
+ 
+void loop(){ 
   bool ready = false;
   if (mySerial.available()) {
     char c = mySerial.read();
@@ -181,4 +196,19 @@ unsigned short sentences, failed_checksum;
     Serial.println("Fitxategia irekitzeko arazoak");
   }
   delay(100);
+  
+   data[0] = counter;
+   data[0] = P;
+   data[1] = T;
+   data[2] = A;
+   data[3] = h;
+   data[4] = lat;
+   data[5] = lon;
+   data[6] = date;
+   data[7] = gps_time;
+   data[8] = gps_speed;
+   
+   radio.write(data, sizeof data);
+   counter = counter + 1;
+   delay(1000);
 }
