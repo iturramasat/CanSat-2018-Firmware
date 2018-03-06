@@ -198,15 +198,15 @@ unsigned short sentences, failed_checksum;
   delay(100);
 
    data[0] = counter;
-   data[1] = P;
-   data[2] = T;
-   data[3] = A;
-   data[4] = h;
-   data[5] = lat;
-   data[6] = lon;
-   data[7] = date;
-   data[8] = gps_time;
-   data[9] = gps_speed;
+   data[1] = P; // Milibar
+   data[2] = T; // Celsius
+   //data[3] = A; // Altuera
+   //data[4] = h; //
+   data[3] = lat; // UTM
+   data[4] = lon; // UTM
+   data[5] = date; // .. ToDo: Test
+   data[6] = gps_time; // .. ToDo: Test
+   data[7] = gps_speed; // ToDo: Test
 
    radio.write(data, sizeof data);
    counter = counter + 1;
