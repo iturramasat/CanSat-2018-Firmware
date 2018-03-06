@@ -23,17 +23,17 @@ File myFile;
 #include <SPI.h>
 #include <nRF24L01.h>
 #include <RF24.h>
- 
+
 const int pinCE = 9;
 const int pinCSN = 10;
 RF24 radio(pinCE, pinCSN);
- 
+
 // Single radio pipe address for the 2 nodes to communicate.
 const uint64_t pipe = 0xE8E8F0F0E1LL;
- 
+
 float data[9];
 int counter = 0;
- 
+
 void setup(){
   Serial.begin(9600);
   gpsSerial.begin(9600)
@@ -79,12 +79,12 @@ long lat, lon;
 unsigned long fix_age, gps_time, date, gps_speed, course;
 unsigned long chars;
 unsigned short sentences, failed_checksum;
-  
+
    radio.begin();
    radio.openWritingPipe(pipe);
 }
- 
-void loop(){ 
+
+void loop(){
   bool ready = false;
   if (mySerial.available()) {
     char c = mySerial.read();
@@ -154,7 +154,7 @@ void loop(){
   if (myFile) {
     Serial.print("SD idazten: ");
 /*
- * 
+ *
 long lat, lon;
 unsigned long fix_age, gps_time, date, gps_speed, course;
 unsigned long chars;
@@ -181,7 +181,7 @@ unsigned short sentences, failed_checksum;
     myFile.print(gps_time);
     myFile.print(",");
     myFile.print(gps_speed);
-    
+
     myFile.close(); //cerramos el archivo
 
     Serial.print("Denbora(ms)=");
@@ -196,18 +196,18 @@ unsigned short sentences, failed_checksum;
     Serial.println("Fitxategia irekitzeko arazoak");
   }
   delay(100);
-  
+
    data[0] = counter;
-   data[0] = P;
-   data[1] = T;
-   data[2] = A;
-   data[3] = h;
-   data[4] = lat;
-   data[5] = lon;
-   data[6] = date;
-   data[7] = gps_time;
-   data[8] = gps_speed;
-   
+   data[1] = P;
+   data[2] = T;
+   data[3] = A;
+   data[4] = h;
+   data[5] = lat;
+   data[6] = lon;
+   data[7] = date;
+   data[8] = gps_time;
+   data[9] = gps_speed;
+
    radio.write(data, sizeof data);
    counter = counter + 1;
    delay(1000);
