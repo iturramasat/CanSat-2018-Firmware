@@ -27,25 +27,25 @@ void loop()
 		//radio.read(data, sizeof data);
 
     data[0] = 1 + data[0];
-    data[1] = random(900,1000);
+    data[1] = random(0,10);
 		data[2] = random(0,30);
 		data[3] = random(0, 1000);
 		data[4] = random(0, 1000);
-		data[5] = millis();
-		data[6] = random(0,20);
-		Serial.print(data[0]);
-		Serial.print(",");
+		//data[5] = millis();
+		//data[6] = random(0,20);
+		Serial.print(data[0] * 3);
+		Serial.print(":");
     Serial.print(data[1]);
-    Serial.print(",");
+    Serial.print(":");
     Serial.print(data[2]);
-    Serial.print(",");
+    Serial.print(":");
     Serial.print(data[3]);
-    Serial.print(",");
+    Serial.print(":");
     Serial.print(data[4]);
-    Serial.print(",");
-    Serial.print(data[5]);
-    Serial.print(",");
-    Serial.print(data[6]);
+    //Serial.print(",");
+    //Serial.print(data[5]);
+    //Serial.print(",");
+    //Serial.print(data[6]);
     Serial.println(";");
 
     delay(100);
