@@ -27,9 +27,9 @@ float gps_alt;
 
 Adafruit_BMP085 bmp;
 
-double Po; //presion del punto inicial para h=0
-char status;
-double Tbmp, Pbmp, Hbmp;
+float Po; //presion del punto inicial para h=0
+int status;
+float Tbmp, Pbmp, Hbmp;
 
 
 /*
@@ -58,7 +58,7 @@ RF24 radio(pinCE, pinCSN);
 
 // Single radio pipe address for the 2 nodes to communicate.
 const uint64_t pipe = 0xA8E8F0F0E1LL;
-float data[9];
+float data[10];
 int counter = 0;
 
 /*
@@ -79,9 +79,9 @@ float readPressure(int pin) {
 
 */
 
-float T1 = 293;//Lur mailako presioa, tenperatura eta altuera
-float P1 = 96724;
-float h1 = 0;
+const float T1 = 293;//Lur mailako presioa, tenperatura eta altuera
+const float P1 = 96724;
+const float h1 = 0;
 
 
 void setup()
