@@ -1,236 +1,317 @@
-/*
+//BMP
+#include <SFE_BMP180.h>
+#include <Wire.h>
 
-   GPS
+SFE_BMP180 bmp180;
 
-*/
+double Po; //presion del punto inicial para h=0;
+char status;
+double Tbmp, Pbmp, Hbmp;
+float Hforbmp;
 
-#include <SoftwareSerial.h>
+//MPX+LM35
+float Pmpx, Hfor, Tlm35;
+
+double T1 = 298; //Lur mailako presioa, tenperatura eta altuera guk zehaztuta
+double P1 = 96700; //double???????
+double h1 = 0;
+
+//GPS
 #include <TinyGPS.h>
-SoftwareSerial gpsSerial(2, 3); // RX, TX
+//#include <SoftwareSerial.h>
+
 TinyGPS gps;
 
-long lat, lon;
-unsigned long fix_age, gps_time, date, gps_speed, course;//COURSEREN KOLOREA ????????????
-unsigned long chars;
-unsigned short sentences, failed_checksum;
+#define gpsPort Serial1
+
+char buf[32];
+
 float gps_alt;
+float flat, flon;
 
+//RADAR
+#define Ntar 5
 
-/*
+uint8_t results[Ntar * 12], buff_temp[4];
+float range[Ntar], velocity[Ntar], SNR[Ntar];
+uint8_t i, bytesToRead;
+unsigned long t1, t2;
 
-   BMP180
+float maiztasuna;
 
-*/
-
-#include <Wire.h>
-#include <Adafruit_BMP085.h>
-
-Adafruit_BMP085 bmp;
-
-float Po; //presion del punto inicial para h=0
-int status;
-float Tbmp, Pbmp, Hbmp;
-
-
-/*
-
-   SD TXARTELA
-
-*/
-
-#include <SD.h>
-File myFile;
-
-
-/*
-
-    NRF24l01
-
-*/
-
-#include <SPI.h>
-#include <nRF24L01.h>
-#include <RF24.h>
-
-const int pinCE = 9;
-const int pinCSN = 10;
-RF24 radio(pinCE, pinCSN);
-
-// Single radio pipe address for the 2 nodes to communicate.
-const uint64_t pipe = 0xA8E8F0F0E1LL;
-float data[10];
+//APC
+String mystringBidali, mystringGorde;
 int counter = 0;
 
-/*
-
-   MPX
-
-*/
-
-float readPressure(int pin) {
-  int pressureValue = analogRead(pin);
-  float Pmpx = ((pressureValue / 1024.0) + 0.095) / 0.000009;
-  return Pmpx;
-}
-
-/*
-
-   Besteak
-
-*/
-
-const float T1 = 293;//Lur mailako presioa, tenperatura eta altuera
-const float P1 = 96724;
-const float h1 = 0;
-
+//Servo
+#include <Servo.h>
+Servo servo1;
+Servo servo2;
+int parakaidas_ireki = 0;
+int parakaidas_itxi = 45;
 
 void setup()
 {
-  Serial.begin(9600);
-  gpsSerial.begin(9600);
+  Serial.begin(115200);
+  Serial.println("Seriala irekita");
+  gpsPort.begin(9600);
+  Serial2.begin(115200);//SD
+  Serial3.begin(115200);//RADAR
 
-  if (!bmp.begin()) {
-    Serial.println("Could not find a valid BMP085 sensor, check wiring!");
-    while (1) {}
-  } else {
-    Serial.println("BMP Sentsorea piztuta");
+  while (Serial3.available()) {
+    Serial3.read();
   }
 
-  Serial.print("SD pizten ...");
-  if (!SD.begin(4)) {
-    Serial.println("SD erabilarazteko arazoak");
-    //return;
-  } else {
-    Serial.println("SD erabilarazia");//ARRAROA????????????
+  //BMP
+  if (bmp180.begin())
+  {
+    Serial.println("BMP180 iniciado");
+    status = bmp180.startTemperature(); //Inicio de lectura de temperatura
+    if (status != 0)
+    {
+      delay(status); //Pausa para que finalice la lectura
+      status = bmp180.getTemperature(Tbmp);//Obtener la temperatura
+      if (status != 0)
+      {
+        status = bmp180.startPressure(3); //Inicio lectura de presión
+        if (status != 0)
+        {
+          delay(status); //Pausa para que finalice la lectura
+          status = bmp180.getPressure(Pbmp, Tbmp); //Obtener la presión
+          if (status != 0)
+          {
+            Po = Pbmp; //Asignamos el valor de presión como punto de referencia
+            Serial.println("Punto de referencia establecido: h=0");
+          }
+        }
+      }
+    }
+
+  }
+  else
+  {
+    Serial.println("Error al iniciar el BMP180");
+    //while (1);
   }
 
-
-  radio.begin();
-  radio.openWritingPipe(pipe);
+  //Servo
+  servo1.attach(22);
+  servo2.attach(23);
 
 }
-
-
 
 void loop()
 {
-  readGroundStation();
-  double Hfor;
-
-  if (gpsSerial.available()) {
-    char c = gpsSerial.read();
-    Serial.write(c);
-    if (gps.encode(c)) {
-      // retrieves +/- lat/long in 100000ths of a degree
-      gps.get_position(&lat, &lon, &fix_age);
-      // +/- altitude in meters
-      gps_alt = gps.f_altitude();
-      // time in hhmmsscc, date in ddmmyy
-      gps.get_datetime(&date, &gps_time, &fix_age);
-
-      // returns speed in 100ths of a knot
-      gps_speed = gps.speed();
-
-      // course in 100ths of a degree
-      course = gps.course();
+  //unsigned long t0 = millis();
+  //BMP
+  status = bmp180.startTemperature(); //Inicio de lectura de temperatura
+  if (status != 0)
+  {
+    delay(status); //Pausa para que finalice la lectura
+    status = bmp180.getTemperature(Tbmp); //Obtener la temperatura
+    if (status != 0)
+    {
+      status = bmp180.startPressure(3); //Inicio lectura de presión
+      if (status != 0)
+      {
+        delay(status); //Pausa para que finalice la lectura
+        status = bmp180.getPressure(Pbmp, Tbmp); //Obtener la presión
+        if (status != 0)
+        {
+          Hbmp = bmp180.altitude(Pbmp, Po); //Calcular altura con respecto al punto de referencia
+          Serial.print("Hbmp= ");
+          Serial.print(Hbmp);
+          Serial.println(" m");
+        }
+      }
     }
   }
+  Serial.print("Pbmp= ");
+  Serial.print(Pbmp * 100);
+  Serial.println(" Pascal");
+  Serial.print("Tbmp= ");
+  Serial.print(Tbmp);
+  Serial.println(" C");
 
-  Tbmp = bmp.readTemperature();
-  Pbmp = bmp.readPressure();
-  Hbmp = bmp.readAltitude();
-  
-  int value = analogRead(A3);
-  float millivolts = (value / 1023.0) * 5000;
-  float Tlm35 = millivolts / 10;
-  Serial.print("Tenperatura lm35= ");
-  Serial.print(Tlm35);
-  Serial.println(" ºC");
+  Hforbmp = (((T1 /  -0.0065) * ((pow(((Pbmp * 100) / P1), (0.0065 * 287.06 / 9.81))) - 1)) + h1);
 
-  float Pmpx = readPressure(A1);
-  float millibars = Pmpx / 100;
+  Serial.print("Hforbmp= ");
+  Serial.print(Hforbmp);
+  Serial.println(" m");
 
-  Serial.print("Presioa MPX= ");
+  //MPX
+  Pmpx = ((((analogRead(A1) * (3.3 / 3.18)) / 1024) + 0.095) / 0.000009);
+
+  Serial.print("Presioa MPX = ");
   Serial.print(Pmpx);
   Serial.println(" Pascal");
-  Serial.print("Presioa MPX= ");
-  Serial.print(millibars);
-  Serial.println(" milibar");
 
   Hfor = (((T1 /  -0.0065) * ((pow(((Pmpx) / P1), (0.0065 * 287.06 / 9.81))) - 1)) + h1);
+
   Serial.print("Altuera formula: ");
   Serial.print(Hfor);
   Serial.println(" m");
-  Serial.println();
 
-  myFile = SD.open("datalog.txt", FILE_WRITE);//abrimos  el archivo
+  //LM35
+  int analogValue = analogRead(A0);
+  float millivolts = (analogValue / 1023.0) * 3300;
+  Tlm35 = millivolts / 10;
+  Serial.print(Tlm35);
+  Serial.println("º LM35");
 
-  if (myFile) {
-    Serial.print("SD idazten: ");
 
-    //myFile.print("Tiempo(ms)=");
-    myFile.print(millis());
-    myFile.print(",");
-    myFile.print(Pbmp);
-    myFile.print(",");
-    myFile.print(Tbmp);
-    myFile.print(",");
-    myFile.print(Hbmp);
-    myFile.print(",");
-    myFile.print(Hfor);
-    myFile.print(",");
-    myFile.print(lat);
-    myFile.print(",");
-    myFile.print(lon);
-    myFile.print(",");
-    myFile.print(date);
-    myFile.print(",");
-    myFile.print(gps_time);
-    myFile.print(",");
-    myFile.print(gps_speed);
-    myFile.print(",");
-    myFile.print(gps_alt);
+  //GPS
+  bool newData = false;
+  unsigned long chars;
+  unsigned short sentences, failed;
 
-    myFile.close(); //cerramos el archivo
+  // For one second we parse GPS data and report some key values
+  //for (unsigned long start = millis(); millis() - start < 1000;) {
+  while (gpsPort.available()) {
+    char c = gpsPort.read();
+    // Serial.write(c); // uncomment this line if you want to see the GPS data flowing
+    if (gps.encode(c)) // Did a new valid sentence come in?
+      newData = true;
+  }
+  //}
 
-  } else {
-    Serial.println("Fitxategia irekitzeko arazoak");
+  unsigned long age;
+  if (newData) {
+    gps_alt = gps.f_altitude();
+    Serial.print("GPS ALTUERA: ");
+    Serial.print(gps_alt);
+    Serial.println(" m");
+    gps.f_get_position(&flat, &flon, &age);
+    Serial.print("LAT=");
+    Serial.print(flat == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flat, 6);
+    Serial.print(" LON=");
+    Serial.print(flon == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flon, 6);
+    Serial.print(" SAT=");
+    Serial.print(gps.satellites() == TinyGPS::GPS_INVALID_SATELLITES ? 0 : gps.satellites());
+    Serial.print(" PREC=");
+    Serial.print(gps.hdop() == TinyGPS::GPS_INVALID_HDOP ? 0 : gps.hdop());
+    //GPS mode
+    Serial.print(" Constellations=");
+    Serial.print(flat == TinyGPS::GPS_INVALID_F_ANGLE ? 0 : gps.constellations());
   }
 
-  data[0] = counter;
-  data[1] = Pbmp;
-  data[2] = Tbmp;
-  data[3] = Pmpx;
-  data[4] = Tlm35;
-  data[5] = lat;
-  data[6] = lon;
-  data[7] = gps_alt;
-  data[8] = gps_time;
-  data[9] = gps_speed;
+  //satellites in view
+  uint32_t* satz = gps.trackedSatellites();
+  uint8_t sat_count = 0;
+  for (int i = 0; i < 24; i++) {
+    if (satz[i] != 0) {  //exclude zero SNR sats
+      sat_count++;
+      byte strength = (satz[i] & 0xFF) >> 1;
+      byte prn = satz[i] >> 8;
+      sprintf(buf, "PRN %d: ", prn);
+      Serial.print(buf);
+      Serial.print(strength);
+      Serial.println("dB");
+    }
+  }
 
-  radio.write(data, sizeof data);
+  //date time
+  int year;
+  uint8_t month, day, hour, minutes, second, hundredths;
+  gps.crack_datetime(&year, &month, &day, &hour, &minutes, &second, &hundredths, &age);
+  sprintf(buf, "GPS time: %d/%02d/%02d %02d:%02d:%02d", year, month, day, hour, minutes, second);
+  Serial.println(buf);
+
+  gps.stats(&chars, &sentences, &failed);
+  Serial.print(" CHARS=");
+  Serial.print(chars);
+  Serial.print(" SENTENCES=");
+  Serial.print(sentences);
+  Serial.print(" CSUM ERR=");
+  Serial.println(failed);
+  if (chars == 0)
+    Serial.println("** No characters received from GPS: check wiring **");
+
+  //RADAR
+  delay(10);
+
+  t1 = millis();
+
+  Serial3.write(255);
+
+  bytesToRead = Serial3.available();
+  while (bytesToRead < 12 * Ntar) {
+    bytesToRead = Serial3.available();
+  }
+
+  t2 = millis() - t1;
+
+  i = 0;
+  while (Serial3.available() && i < 12 * Ntar) {
+    results[i] = Serial3.read();
+    i++;
+  }
+
+  for (i = 0; i < Ntar; i++) {
+    buff_temp[0] = results[i * 4];
+    buff_temp[1] = results[i * 4 + 1];
+    buff_temp[2] = results[i * 4 + 2];
+    buff_temp[3] = results[i * 4 + 3];
+    range[i] = *((float*)(buff_temp));
+
+    buff_temp[0] = results[Ntar * 4 + i * 4];
+    buff_temp[1] = results[Ntar * 4 + i * 4 + 1];
+    buff_temp[2] = results[Ntar * 4 + i * 4 + 2];
+    buff_temp[3] = results[Ntar * 4 + i * 4 + 3];
+    velocity[i] = *((float*)(buff_temp));
+
+    buff_temp[0] = results[Ntar * 8 + i * 4];
+    buff_temp[1] = results[Ntar * 8 + i * 4 + 1];
+    buff_temp[2] = results[Ntar * 8 + i * 4 + 2];
+    buff_temp[3] = results[Ntar * 8 + i * 4 + 3];
+    SNR[i] = *((float*)(buff_temp));
+  }
+  for (i = 0; i < Ntar; i++) {
+    Serial.print("### Target ");
+    Serial.print(i + 1);
+    Serial.println(" ###");
+
+    Serial.print("Range: ");
+    Serial.print(range[i]);
+    Serial.println(" m");
+
+    Serial.print("Velocity: ");
+    Serial.print(velocity[i]);
+    Serial.println(" m/s");
+
+    Serial.print("SNR: ");
+    Serial.print(SNR[i]);
+    Serial.println(" dB");
+    Serial.println("");
+  }
+  Serial.println(t2);
+  Serial.println("");
+
+  //APC
   counter = counter + 1;
-}
+  maiztasuna = counter * 1000 / millis();
+  Serial.print("Maiztasuna: ");
+  Serial.print(maiztasuna);
+  Serial.println(" pakete/s");
 
-/*
- * Komunikazio bidirekzionala programatzen hasi..
- */
+  mystringBidali = String(counter) + ":" + String(Pbmp) + ":" + String(Tbmp) + ":" + String(Hbmp) + ":" +  String(Hforbmp) + ":" +  String(range[0]) + ":" + String(Tlm35) + ":" + String(Pmpx / 100) + ":" + String(Hfor) + ":" + String(flat * 100000) + ":" + String(flon * 100000) + ":" + String(gps_alt) + ";";
 
-int send_delay;
-boolean enable_accel, cam1_recording, cam2_recording;
+  mystringGorde = String(counter) + ":" + String(millis()) + ":" + String(Pbmp) + ":" + String(Tbmp) + ":" + String(Hbmp) + ":" +  String(Hforbmp) + ":" +  String(range[0]) + ":" + String(Tlm35) + ":" + String(Pmpx / 100) + ":" + String(Hfor) + ":" + String(flat * 1000) + ":" + String(flon * 1000) + ":" + String(gps_alt) + ";";
 
-void readGroundStation(){
-  if (radio.available())
-   {    
-      radio.read(data, sizeof data);
-      /*  1. send_delay = Delay between sends (int)
-       *  2. enable_accel = Accelerometer on/off (bool)
-       *  3. cam1_recording = Camara 1 status (Recording on/off)
-       *  4. cam2_recording = Camara 2 status (Recording on/off)
-       */
-      send_delay = data[0];
-      enable_accel = data[1];
-      cam1_recording = data[2];
-      cam2_recording = data[3];
-   }
+  Serial1.println(mystringBidali);
+  Serial2.println(mystringGorde);
+  Serial.println(mystringBidali);
+
+  //Servo
+  
+  if (Serial.available()) {
+    char mezua = Serial.read();
+    if (mezua == 'A') {
+      servo1.write(parakaidas_ireki);
+      servo2.write(parakaidas_ireki);
+    } else if (mezua == 'B') {
+      servo1.write(parakaidas_itxi);
+      servo2.write(parakaidas_itxi);
+    }
+  }
 }
